@@ -7,6 +7,7 @@ The lark client is injected per-thread by the comment event handler.
 
 import json
 import logging
+import os
 import threading
 
 from tools.registry import registry, tool_error, tool_result
@@ -23,8 +24,30 @@ def set_client(client):
 
 
 def get_client():
-    """Return the lark client for the current thread, or None."""
-    return getattr(_local, "client", None)
+    """Return the injected client or build one from configured credentials."""
+    client = getattr(_local, "client", None)
+    if client is not None:
+        return client
+
+    app_id = os.getenv("FEISHU_APP_ID")
+    app_secret = os.getenv("FEISHU_APP_SECRET")
+    if not app_id or not app_secret:
+        return None
+
+    try:
+        from lark_oapi import Client, LogLevel
+    except ImportError:
+        return None
+
+    client = (
+        Client.builder()
+        .app_id(app_id)
+        .app_secret(app_secret)
+        .log_level(LogLevel.WARNING)
+        .build()
+    )
+    _local.client = client
+    return client
 
 
 def _check_feishu():
